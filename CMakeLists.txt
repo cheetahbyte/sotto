@@ -7,7 +7,20 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_OBJCXX_STANDARD 23)
 set(CMAKE_OBJCXX_STANDARD_REQUIRED ON)
-add_compile_options(-Wall -Wextra)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+add_compile_options(
+  -Wall -Wextra -Wpedantic -Werror
+  -Wconversion -Wsign-conversion -Wshadow -Wformat=2 -Wnull-dereference
+  -Wdouble-promotion -Wimplicit-fallthrough -Wunsafe-buffer-usage
+  -Wlifetime-safety -Wthread-safety -Wdangling)
+add_compile_definitions(_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_EXTENSIVE)
+
+set(SOTTO_SANITIZE "" CACHE STRING "Sanitizers for all targets, for example address,undefined or thread")
+if(SOTTO_SANITIZE)
+  add_compile_options(-fsanitize=${SOTTO_SANITIZE} -fno-omit-frame-pointer -fno-sanitize-recover=all)
+  add_link_options(-fsanitize=${SOTTO_SANITIZE})
+endif()
 
 add_library(SottoCore STATIC Sources/Core/Session.cpp Sources/Core/ShortcutGesture.cpp)
 target_include_directories(SottoCore PUBLIC Sources/Core)
@@ -47,6 +60,15 @@ add_custom_command(TARGET Sotto POST_BUILD
   COMMAND codesign --force --sign "${SOTTO_CODESIGN_IDENTITY}" --identifier com.example.Sotto
           "$<TARGET_BUNDLE_DIR:Sotto>"
   VERBATIM)
+
+find_program(CLANG_TIDY NAMES clang-tidy HINTS /opt/homebrew/opt/llvm/bin /usr/local/opt/llvm/bin)
+if(CLANG_TIDY)
+  file(GLOB SOTTO_TIDY_SOURCES CONFIGURE_DEPENDS Sources/App/*.mm Sources/Core/*.cpp Tests/*.cpp)
+  add_custom_target(tidy
+    COMMAND ${CLANG_TIDY} -p ${CMAKE_BINARY_DIR} --quiet ${SOTTO_TIDY_SOURCES}
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    VERBATIM)
+endif()
 
 enable_testing()
 add_executable(SessionTests Tests/SessionTests.cpp)

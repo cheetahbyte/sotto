@@ -3,6 +3,8 @@
 #import "Defaults.h"
 #import "SettingsPanes.h"
 
+#include <utility>
+
 @interface SettingsTabViewController : NSTabViewController
 @end
 
@@ -47,13 +49,14 @@
     [tabs addTabViewItem:item];
   }
   const NSInteger lastPane = [NSUserDefaults.standardUserDefaults integerForKey:kSettingsPaneKey];
-  if (lastPane > 0 && lastPane < (NSInteger)panes.count) tabs.selectedTabViewItemIndex = lastPane;
+  if (lastPane > 0 && std::cmp_less(lastPane, panes.count)) tabs.selectedTabViewItemIndex = lastPane;
 
   NSWindow *window = [NSWindow windowWithContentViewController:tabs];
   window.styleMask = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable;
   window.toolbarStyle = NSWindowToolbarStylePreference;
-  if (!(self = [super initWithWindow:window])) return nil;
-  [tabs fitWindowToPane:tabs.tabViewItems[tabs.selectedTabViewItemIndex] animated:NO];
+  self = [super initWithWindow:window];
+  if (!self) return nil;
+  [tabs fitWindowToPane:tabs.tabViewItems[static_cast<NSUInteger>(tabs.selectedTabViewItemIndex)] animated:NO];
   [window center];
   return self;
 }

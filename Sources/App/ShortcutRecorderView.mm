@@ -14,7 +14,8 @@ static const CGFloat kCancelSize = 14;
 }
 
 - (instancetype)initWithFrame:(NSRect)frame {
-  if (!(self = [super initWithFrame:frame])) return nil;
+  self = [super initWithFrame:frame];
+  if (!self) return nil;
   self.toolTip = @"Click to record a new shortcut";
   [self setAccessibilityElement:YES];
   [self setAccessibilityRole:NSAccessibilityButtonRole];

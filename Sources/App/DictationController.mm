@@ -18,7 +18,7 @@ NSNotificationName const DictationDidChangeNotification = @"DictationDidChange";
 static const NSUInteger kMaxRecents = 8;
 static const NSTimeInterval kTickInterval = 1.0 / 60;
 
-static NSString *String(const std::string &s) { return [NSString stringWithUTF8String:s.c_str()] ?: @""; }
+static NSString *String(const std::string &s) { return OrEmpty([NSString stringWithUTF8String:s.c_str()]); }
 
 static sotto::Seconds Now() { return sotto::Seconds{CACurrentMediaTime()}; }
 
@@ -30,15 +30,15 @@ struct FailureMessage {
 static FailureMessage MessageFor(sotto::Failure reason) {
   switch (reason) {
     case sotto::Failure::MicrophoneAccessDenied:
-      return {@"mic.slash.fill", @"Sotto can’t access the microphone"};
+      return {.symbol = @"mic.slash.fill", .text = @"Sotto can’t access the microphone"};
     case sotto::Failure::MicrophoneSilent:
-      return {@"mic.slash.fill", @"No sound from the microphone. Choose another in Settings."};
+      return {.symbol = @"mic.slash.fill", .text = @"No sound from the microphone. Choose another in Settings."};
     case sotto::Failure::APIKeyMissing:
-      return {@"key.fill", @"Add your API key in Sotto Settings"};
+      return {.symbol = @"key.fill", .text = @"Add your API key in Sotto Settings"};
     case sotto::Failure::APIKeyRejected:
-      return {@"key.fill", @"The API key wasn’t accepted"};
+      return {.symbol = @"key.fill", .text = @"The API key wasn’t accepted"};
     case sotto::Failure::ServiceUnavailable:
-      return {@"wifi.exclamationmark", @"Couldn’t reach the dictation service"};
+      return {.symbol = @"wifi.exclamationmark", .text = @"Couldn’t reach the dictation service"};
   }
 }
 
@@ -64,7 +64,8 @@ static void Announce(NSString *announcement) {
 }
 
 - (instancetype)init {
-  if (!(self = [super init])) return nil;
+  self = [super init];
+  if (!self) return nil;
   _hud = [DictationHUD new];
   _recents = [NSMutableArray new];
 
@@ -111,7 +112,7 @@ static void Announce(NSString *announcement) {
       if (_session.start([RecognizerService.selected makeRecognizer])) [self startTicking];
       break;
     case sotto::GestureCommand::Finish:
-      (void)_session.stop();
+      if (!_session.stop()) return;
       break;
     case sotto::GestureCommand::Cancel:
       if (_session.listening()) _session.cancel();
@@ -145,7 +146,7 @@ static void Announce(NSString *announcement) {
 #pragma mark Presentation
 
 - (void)show {
-  if (auto *listening = std::get_if<sotto::Listening>(&_session.phase())) _hud.level = listening->level;
+  if (auto *listening = std::get_if<sotto::Listening>(&_session.phase())) _hud.level = static_cast<CGFloat>(listening->level);
   if (_session.revision() == _shownRevision) return;
   _shownRevision = _session.revision();
 

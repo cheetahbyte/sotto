@@ -9,11 +9,14 @@ using namespace sotto;
 using namespace std::chrono_literals;
 
 namespace {
-int failures = 0;
+int& failures() {
+  static int count = 0;
+  return count;
+}
 
 void check(bool ok, std::string_view what, std::source_location at = std::source_location::current()) {
   if (ok) return;
-  ++failures;
+  ++failures();
   std::println(stderr, "FAIL line {}: {}", at.line(), what);
 }
 
@@ -32,17 +35,29 @@ struct Probe {
   bool destroyed = false;
 };
 
-struct FakeRecognizer final : Recognizer {
-  explicit FakeRecognizer(Probe& probe, bool fail_on_start = false) : probe(probe), fail_on_start(fail_on_start) {}
-  ~FakeRecognizer() override { probe.destroyed = true; }
+class FakeRecognizer final : public Recognizer {
+ public:
+  explicit FakeRecognizer(Probe& probe, bool fail_on_start = false) : probe_(&probe), fail_on_start_(fail_on_start) {}
+  FakeRecognizer(const FakeRecognizer&) = delete;
+  FakeRecognizer& operator=(const FakeRecognizer&) = delete;
+  FakeRecognizer(FakeRecognizer&&) = delete;
+  FakeRecognizer& operator=(FakeRecognizer&&) = delete;
+  ~FakeRecognizer() override { probe_->destroyed = true; }
+
   void start(Listener& listener) override {
-    probe.listener = &listener;
-    if (fail_on_start) listener.failed(Failure::APIKeyMissing);
+    probe_->listener = &listener;
+    if (fail_on_start_) listener.failed(Failure::APIKeyMissing);
   }
-  void finish() override { probe.finish_requested = true; }
-  Probe& probe;
-  bool fail_on_start;
+  void finish() override { probe_->finish_requested = true; }
+
+ private:
+  Probe* probe_;
+  bool fail_on_start_;
 };
+
+void begin(Session& session, Probe& probe) {
+  check(session.start(std::make_unique<FakeRecognizer>(probe)).has_value(), "start from idle");
+}
 
 void transitions_are_checked() {
   Probe probe, ignored;
@@ -57,7 +72,7 @@ void transitions_are_checked() {
 void dictation_runs_from_listening_to_finished() {
   Probe probe;
   Session session;
-  (void)session.start(std::make_unique<FakeRecognizer>(probe));
+  begin(session, probe);
 
   const auto before = session.revision();
   probe.listener->level_changed(0.5f);
@@ -88,23 +103,22 @@ void dictation_runs_from_listening_to_finished() {
 void nothing_said_returns_to_idle() {
   Probe probe;
   Session session;
-  (void)session.start(std::make_unique<FakeRecognizer>(probe));
-  (void)session.stop();
+  begin(session, probe);
+  check(session.stop().has_value(), "stop while listening");
   probe.listener->finished("");
   check(is<Idle>(session), "empty text means no result");
 }
 
 void failures_are_shown_then_cleared() {
-  Probe probe;
+  Probe probe, failing;
   Session session;
-  (void)session.start(std::make_unique<FakeRecognizer>(probe));
+  begin(session, probe);
   probe.listener->failed(Failure::ServiceUnavailable);
   auto* failed = std::get_if<Failed>(&session.phase());
   check(failed && failed->reason == Failure::ServiceUnavailable, "failure is shown");
   run(session, 5s);
   check(is<Idle>(session) && probe.destroyed, "failure clears by itself");
 
-  Probe failing;
   check(session.start(std::make_unique<FakeRecognizer>(failing, true)).has_value(), "start succeeds");
   check(is<Failed>(session), "a recognizer may fail inside start()");
 }
@@ -112,7 +126,7 @@ void failures_are_shown_then_cleared() {
 void cancel_destroys_the_recognizer() {
   Probe probe;
   Session session;
-  (void)session.start(std::make_unique<FakeRecognizer>(probe));
+  begin(session, probe);
   session.cancel();
   check(is<Idle>(session), "cancel returns to idle");
   check(probe.destroyed, "cancel lets the recognizer go at once");
@@ -121,11 +135,15 @@ void cancel_destroys_the_recognizer() {
 }
 
 int main() {
-  transitions_are_checked();
-  dictation_runs_from_listening_to_finished();
-  nothing_said_returns_to_idle();
-  failures_are_shown_then_cleared();
-  cancel_destroys_the_recognizer();
-  if (failures == 0) std::println("all session tests passed");
-  return failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+  try {
+    transitions_are_checked();
+    dictation_runs_from_listening_to_finished();
+    nothing_said_returns_to_idle();
+    failures_are_shown_then_cleared();
+    cancel_destroys_the_recognizer();
+    if (failures() == 0) std::println("all session tests passed");
+    return failures() == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+  } catch (...) {
+    return EXIT_FAILURE;
+  }
 }

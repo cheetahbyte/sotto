@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <span>
+#include <vector>
 
 static const float kQuietDecibels = -55;
 static const float kLoudDecibels = -10;
@@ -12,7 +13,7 @@ static const float kLoudDecibels = -10;
 static float Level(std::span<const int16_t> samples) {
   double sum = 0;
   for (int16_t sample : samples) sum += double(sample) * sample;
-  const float rms = static_cast<float>(std::sqrt(sum / samples.size()) / 32768.0);
+  const auto rms = static_cast<float>(std::sqrt(sum / static_cast<double>(samples.size())) / 32768.0);
   const float decibels = 20 * std::log10(std::max(rms, 1e-6f));
   return std::clamp((decibels - kQuietDecibels) / (kLoudDecibels - kQuietDecibels), 0.0f, 1.0f);
 }
@@ -43,7 +44,8 @@ static float Level(std::span<const int16_t> samples) {
 }
 
 - (instancetype)initWithDeviceUID:(NSString *)deviceUID sampleRate:(double)sampleRate handler:(MicrophoneCaptureHandler)handler {
-  if (!(self = [super init])) return nil;
+  self = [super init];
+  if (!self) return nil;
   _deviceUID = [deviceUID copy];
   _sampleRate = sampleRate;
   _handler = [handler copy];
@@ -53,7 +55,7 @@ static float Level(std::span<const int16_t> samples) {
 
 - (AVCaptureDevice *)device {
   AVCaptureDevice *chosen = _deviceUID.length ? [AVCaptureDevice deviceWithUniqueID:_deviceUID] : nil;
-  return chosen ?: [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeAudio];
+  return chosen ? chosen : [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeAudio];
 }
 
 - (BOOL)start {
@@ -98,14 +100,16 @@ static float Level(std::span<const int16_t> samples) {
   CMBlockBufferRef block = CMSampleBufferGetDataBuffer(sampleBuffer);
   const size_t sampleCount = block ? CMBlockBufferGetDataLength(block) / sizeof(int16_t) : 0;
   if (sampleCount == 0) return;
-  NSMutableData *pcm = [NSMutableData dataWithLength:sampleCount * sizeof(int16_t)];
-  if (CMBlockBufferCopyDataBytes(block, 0, pcm.length, pcm.mutableBytes) != kCMBlockBufferNoErr) return;
+  std::vector<int16_t> samples(sampleCount);
+  const size_t byteCount = sampleCount * sizeof(int16_t);
+  if (CMBlockBufferCopyDataBytes(block, 0, byteCount, samples.data()) != kCMBlockBufferNoErr) return;
 
-  const float level = Level({static_cast<const int16_t *>(pcm.bytes), sampleCount});
+  NSData *pcm = [NSData dataWithBytes:samples.data() length:byteCount];
+  const float level = Level(samples);
   __weak MicrophoneCapture *weakSelf = self;
   dispatch_async(dispatch_get_main_queue(), ^{
-    MicrophoneCapture *self = weakSelf;
-    if (self && self->_running) self->_handler(pcm, level);
+    MicrophoneCapture *capture = weakSelf;
+    if (capture && capture->_running) capture->_handler(pcm, level);
   });
 }
 

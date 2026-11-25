@@ -1,8 +1,8 @@
 #import "OpenAIRealtimeRecognizer.h"
 
 #include <algorithm>
-#include <span>
 
+#import "Defaults.h"
 #import "MicrophoneCapture.h"
 
 using Listener = sotto::Recognizer::Listener;
@@ -18,8 +18,8 @@ static NSString *const kTranscriptCompleted = @"conversation.item.input_audio_tr
 static NSString *const kTranscriptFailed = @"conversation.item.input_audio_transcription.failed";
 
 static BOOL ContainsSound(NSData *pcm) {
-  const std::span samples{static_cast<const int16_t *>(pcm.bytes), pcm.length / sizeof(int16_t)};
-  return std::ranges::any_of(samples, [](int16_t sample) { return sample != 0; });
+  NSData *silence = [NSMutableData dataWithLength:pcm.length];
+  return silence && ![pcm isEqualToData:silence];
 }
 
 static NSArray<NSString *> *AcceptedKeywords(const std::vector<std::string> &keywords) {
@@ -62,7 +62,8 @@ static NSArray<NSString *> *AcceptedKeywords(const std::vector<std::string> &key
 }
 
 - (instancetype)initWithOptions:(const OpenAIRealtimeRecognizer::Options &)options {
-  if (!(self = [super init])) return nil;
+  self = [super init];
+  if (!self) return nil;
   _apiKey = @(options.api_key.c_str());
   _language = @(options.language.c_str());
   _keywords = AcceptedKeywords(options.keywords);
@@ -86,10 +87,10 @@ static NSArray<NSString *> *AcceptedKeywords(const std::vector<std::string> &key
 
   __weak OpenAIRealtimeClient *weakSelf = self;
   [MicrophoneCapture requestAccess:^(BOOL granted) {
-    OpenAIRealtimeClient *self = weakSelf;
-    if (!self || !self->_listener) return;
-    if (!granted || ![self->_microphone start]) return [self endWithFailure:sotto::Failure::MicrophoneAccessDenied];
-    [self connect];
+    OpenAIRealtimeClient *client = weakSelf;
+    if (!client || !client->_listener) return;
+    if (!granted || ![client->_microphone start]) return [client endWithFailure:sotto::Failure::MicrophoneAccessDenied];
+    [client connect];
   }];
 }
 
@@ -121,7 +122,7 @@ static NSArray<NSString *> *AcceptedKeywords(const std::vector<std::string> &key
   if (!listener) return;
   NSString *text = [self transcript];
   [self invalidate];
-  listener->finished(text.UTF8String);
+  listener->finished(StdString(text));
 }
 
 - (void)endWithFailure:(sotto::Failure)reason {
@@ -166,7 +167,9 @@ static NSArray<NSString *> *AcceptedKeywords(const std::vector<std::string> &key
 #pragma mark Connection
 
 - (void)connect {
-  NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:kEndpoint]];
+  NSURL *endpoint = [NSURL URLWithString:kEndpoint];
+  if (!endpoint) return [self endWithFailure:sotto::Failure::ServiceUnavailable];
+  NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:endpoint];
   [request setValue:[@"Bearer " stringByAppendingString:_apiKey] forHTTPHeaderField:@"Authorization"];
   _urlSession = [NSURLSession sessionWithConfiguration:NSURLSessionConfiguration.ephemeralSessionConfiguration
                                               delegate:self
@@ -203,6 +206,7 @@ static NSArray<NSString *> *AcceptedKeywords(const std::vector<std::string> &key
 
 - (void)send:(NSDictionary *)event {
   NSData *json = [NSJSONSerialization dataWithJSONObject:event options:0 error:nil];
+  if (!json) return;
   NSString *string = [[NSString alloc] initWithData:json encoding:NSUTF8StringEncoding];
   [_socket sendMessage:[[NSURLSessionWebSocketMessage alloc] initWithString:string] completionHandler:^(NSError *) {}];
 }
@@ -211,12 +215,12 @@ static NSArray<NSString *> *AcceptedKeywords(const std::vector<std::string> &key
   __weak OpenAIRealtimeClient *weakSelf = self;
   [_socket receiveMessageWithCompletionHandler:^(NSURLSessionWebSocketMessage *message, NSError *error) {
     dispatch_async(dispatch_get_main_queue(), ^{
-      OpenAIRealtimeClient *self = weakSelf;
-      if (!self || !self->_listener || error) return;
+      OpenAIRealtimeClient *client = weakSelf;
+      if (!client || !client->_listener || error) return;
       NSData *json = message.type == NSURLSessionWebSocketMessageTypeString ? [message.string dataUsingEncoding:NSUTF8StringEncoding] : message.data;
       NSDictionary *event = json ? [NSJSONSerialization JSONObjectWithData:json options:0 error:nil] : nil;
-      if ([event isKindOfClass:NSDictionary.class]) [self handle:event];
-      if (self->_listener) [self receiveNextEvent];
+      if ([event isKindOfClass:NSDictionary.class]) [client handle:event];
+      if (client->_listener) [client receiveNextEvent];
     });
   }];
 }
@@ -231,9 +235,9 @@ static NSArray<NSString *> *AcceptedKeywords(const std::vector<std::string> &key
     _sessionReady = YES;
     _finishRequested ? [self sendAudioAndCommitIfReady] : [self sendAudioLeavingRemainder:YES];
   } else if ([type isEqualToString:kTranscriptDelta]) {
-    [self setText:[(_itemText[item] ?: @"") stringByAppendingString:event[@"delta"] ?: @""] forItem:item];
+    [self setText:[OrEmpty(_itemText[item]) stringByAppendingString:OrEmpty(event[@"delta"])] forItem:item];
   } else if ([type isEqualToString:kTranscriptCompleted]) {
-    [self setText:event[@"transcript"] ?: @"" forItem:item];
+    [self setText:OrEmpty(event[@"transcript"]) forItem:item];
     [self settle:item];
   } else if ([type isEqualToString:kTranscriptFailed]) {
     [self settle:item];
@@ -255,7 +259,7 @@ static NSArray<NSString *> *AcceptedKeywords(const std::vector<std::string> &key
   if (!item) return;
   if (!_itemText[item]) [_itemOrder addObject:item];
   _itemText[item] = text;
-  if (_listener) _listener->heard({.finalized = [self transcript].UTF8String, .tentative = {}});
+  if (_listener) _listener->heard({.finalized = StdString([self transcript]), .tentative = {}});
 }
 
 - (void)settle:(NSString *)item {
@@ -280,7 +284,7 @@ static NSArray<NSString *> *AcceptedKeywords(const std::vector<std::string> &key
 
 #pragma mark - Recognizer
 
-OpenAIRealtimeRecognizer::OpenAIRealtimeRecognizer(Options options)
+OpenAIRealtimeRecognizer::OpenAIRealtimeRecognizer(const Options& options)
     : client_([[OpenAIRealtimeClient alloc] initWithOptions:options]) {}
 
 OpenAIRealtimeRecognizer::~OpenAIRealtimeRecognizer() { [client_ invalidate]; }

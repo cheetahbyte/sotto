@@ -2,7 +2,7 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-typedef void (^MicrophoneCaptureHandler)(NSData *pcm, float level);
+using MicrophoneCaptureHandler = void (^)(NSData *pcm, float level);
 
 @interface MicrophoneCapture : NSObject
 + (void)requestAccess:(void (^)(BOOL granted))completion;

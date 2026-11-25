@@ -10,7 +10,8 @@ static const CGFloat kWidth = 480;
 static const CGFloat kTextWidth = 300;
 
 static NSImageView *Symbol(NSString *name, CGFloat pointSize, NSFontWeight weight) {
-  NSImageView *view = [NSImageView imageViewWithImage:[NSImage imageWithSystemSymbolName:name accessibilityDescription:nil]];
+  NSImageView *view = [NSImageView new];
+  view.image = [NSImage imageWithSystemSymbolName:name accessibilityDescription:nil];
   view.symbolConfiguration = [NSImageSymbolConfiguration configurationWithPointSize:pointSize weight:weight];
   view.contentTintColor = NSColor.controlAccentColor;
   return view;
@@ -63,7 +64,8 @@ static NSView *Row(NSString *symbol, NSString *title, NSString *body, NSView *ac
   window.releasedWhenClosed = NO;
   [window standardWindowButton:NSWindowMiniaturizeButton].hidden = YES;
   [window standardWindowButton:NSWindowZoomButton].hidden = YES;
-  if (!(self = [super initWithWindow:window])) return nil;
+  self = [super initWithWindow:window];
+  if (!self) return nil;
 
   _continue = [NSButton buttonWithTitle:@"Continue" target:self action:@selector(advance:)];
   _continue.controlSize = NSControlSizeLarge;
@@ -189,7 +191,8 @@ static NSView *Row(NSString *symbol, NSString *title, NSString *body, NSView *ac
 
 - (void)allow:(NSButton *)sender {
   if ([AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeAudio] == AVAuthorizationStatusDenied) {
-    [NSWorkspace.sharedWorkspace openURL:[NSURL URLWithString:@"x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"]];
+    NSURL *settings = [NSURL URLWithString:@"x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"];
+    if (settings) [NSWorkspace.sharedWorkspace openURL:settings];
     return;
   }
   [AVCaptureDevice requestAccessForMediaType:AVMediaTypeAudio completionHandler:^(BOOL granted) {

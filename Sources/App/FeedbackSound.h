@@ -2,7 +2,7 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-typedef NSString *FeedbackSoundName NS_STRING_ENUM;
+using FeedbackSoundName = NSString *;
 extern FeedbackSoundName const FeedbackSoundStart;
 extern FeedbackSoundName const FeedbackSoundStop;
 extern FeedbackSoundName const FeedbackSoundCancel;

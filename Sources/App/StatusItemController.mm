@@ -17,7 +17,8 @@ static const NSUInteger kRecentTitleLength = 48;
 }
 
 - (instancetype)initWithDictation:(DictationController *)dictation {
-  if (!(self = [super init])) return nil;
+  self = [super init];
+  if (!self) return nil;
   _dictation = dictation;
 
   _item = [NSStatusBar.systemStatusBar statusItemWithLength:NSSquareStatusItemLength];
@@ -101,7 +102,7 @@ static const NSUInteger kRecentTitleLength = 48;
 - (NSMenuItem *)languageMenu {
   NSMenuItem *parent = [self item:@"Language" action:nil];
   parent.submenu = [NSMenu new];
-  NSString *selected = [NSUserDefaults.standardUserDefaults stringForKey:kLanguageKey];
+  NSString *selected = OrEmpty([NSUserDefaults.standardUserDefaults stringForKey:kLanguageKey]);
   for (NSString *language in SottoLanguages()) {
     NSMenuItem *item = [self item:language action:@selector(chooseLanguage:)];
     item.state = [language isEqualToString:selected] ? NSControlStateValueOn : NSControlStateValueOff;
@@ -119,7 +120,7 @@ static const NSUInteger kRecentTitleLength = 48;
 - (NSMenuItem *)microphoneMenu {
   NSMenuItem *parent = [self item:@"Microphone" action:nil];
   parent.submenu = [NSMenu new];
-  NSString *selected = [NSUserDefaults.standardUserDefaults stringForKey:kMicrophoneKey] ?: @"";
+  NSString *selected = OrEmpty([NSUserDefaults.standardUserDefaults stringForKey:kMicrophoneKey]);
   NSMutableArray<NSArray<NSString *> *> *choices = [@[ @[ @"System Default", @"" ] ] mutableCopy];
   for (AudioInputDevice *device in AudioInputDevice.all) [choices addObject:@[ device.name, device.uid ]];
   for (NSArray<NSString *> *choice in choices) {
@@ -145,8 +146,10 @@ static const NSUInteger kRecentTitleLength = 48;
 }
 
 - (void)copyRecent:(NSMenuItem *)sender {
+  NSString *text = sender.representedObject;
+  if (!text) return;
   [NSPasteboard.generalPasteboard clearContents];
-  [NSPasteboard.generalPasteboard setString:sender.representedObject forType:NSPasteboardTypeString];
+  [NSPasteboard.generalPasteboard setString:text forType:NSPasteboardTypeString];
 }
 
 @end

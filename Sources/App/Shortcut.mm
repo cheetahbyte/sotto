@@ -2,6 +2,8 @@
 
 #import <Carbon/Carbon.h>
 
+#include <array>
+
 #import "Defaults.h"
 #import "HotKey.h"
 
@@ -14,22 +16,34 @@ static const NSEventModifierFlags kCommonModifiers =
 
 namespace {
 struct ModifierKey {
-  NSInteger keyCode;
-  NSUInteger deviceFlag;
-  NSString *label;
+  NSInteger keyCode = 0;
+  NSUInteger deviceFlag = 0;
+  NSString *label = nil;
 };
-const ModifierKey kModifierKeys[] = {
-    {kVK_Function, NSEventModifierFlagFunction, @"Fn"},
-    {kVK_Control, 0x0001, @"Left Control"}, {kVK_RightControl, 0x2000, @"Right Control"},
-    {kVK_Option, 0x0020, @"Left Option"},   {kVK_RightOption, 0x0040, @"Right Option"},
-    {kVK_Shift, 0x0002, @"Left Shift"},     {kVK_RightShift, 0x0004, @"Right Shift"},
-    {kVK_Command, 0x0008, @"Left Command"}, {kVK_RightCommand, 0x0010, @"Right Command"},
-};
+
+ModifierKey Key(NSInteger keyCode, NSUInteger deviceFlag, NSString *label) {
+  return {.keyCode = keyCode, .deviceFlag = deviceFlag, .label = label};
+}
+
+const std::array<ModifierKey, 9> &ModifierKeys() {
+  static const std::array<ModifierKey, 9> keys = {
+      Key(kVK_Function, NSEventModifierFlagFunction, @"Fn"),
+      Key(kVK_Control, 0x0001, @"Left Control"),
+      Key(kVK_RightControl, 0x2000, @"Right Control"),
+      Key(kVK_Option, 0x0020, @"Left Option"),
+      Key(kVK_RightOption, 0x0040, @"Right Option"),
+      Key(kVK_Shift, 0x0002, @"Left Shift"),
+      Key(kVK_RightShift, 0x0004, @"Right Shift"),
+      Key(kVK_Command, 0x0008, @"Left Command"),
+      Key(kVK_RightCommand, 0x0010, @"Right Command"),
+  };
+  return keys;
+}
 }
 
 NSArray<NSNumber *> *ModifierKeyCodesDown(NSEventModifierFlags flags) {
   NSMutableArray *down = [NSMutableArray new];
-  for (const ModifierKey &key : kModifierKeys) {
+  for (const ModifierKey &key : ModifierKeys()) {
     if (flags & key.deviceFlag) [down addObject:@(key.keyCode)];
   }
   return down;
@@ -37,7 +51,7 @@ NSArray<NSNumber *> *ModifierKeyCodesDown(NSEventModifierFlags flags) {
 
 NSString *ModifierKeysDisplayString(NSArray<NSNumber *> *keyCodes) {
   NSMutableArray *names = [NSMutableArray new];
-  for (const ModifierKey &key : kModifierKeys) {
+  for (const ModifierKey &key : ModifierKeys()) {
     if ([keyCodes containsObject:@(key.keyCode)]) [names addObject:key.label];
   }
   return [names componentsJoinedByString:@" + "];
@@ -57,13 +71,15 @@ static NSString *KeyName(NSInteger keyCode) {
   TISInputSourceRef source = TISCopyCurrentKeyboardLayoutInputSource();
   auto data = static_cast<CFDataRef>(TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData));
   if (data) {
-    auto layout = reinterpret_cast<const UCKeyboardLayout *>(CFDataGetBytePtr(data));
+    const void *bytes = CFDataGetBytePtr(data);
+    const auto *layout = static_cast<const UCKeyboardLayout *>(bytes);
     UInt32 deadKeys = 0;
-    UniChar chars[4];
+    std::array<UniChar, 4> chars{};
     UniCharCount length = 0;
     if (UCKeyTranslate(layout, static_cast<UInt16>(keyCode), kUCKeyActionDisplay, 0, LMGetKbdType(),
-                       kUCKeyTranslateNoDeadKeysMask, &deadKeys, 4, &length, chars) == noErr && length > 0) {
-      result = [NSString stringWithCharacters:chars length:length].uppercaseString;
+                       kUCKeyTranslateNoDeadKeysMask, &deadKeys, chars.size(), &length, chars.data()) == noErr &&
+        length > 0 && length <= chars.size()) {
+      result = [NSString stringWithCharacters:chars.data() length:length].uppercaseString;
     }
   }
   CFRelease(source);
@@ -73,7 +89,8 @@ static NSString *KeyName(NSInteger keyCode) {
 @implementation Shortcut
 
 - (instancetype)initWithKeyCode:(NSInteger)keyCode modifiers:(NSEventModifierFlags)modifiers modifierKeyCodes:(NSArray *)keyCodes {
-  if (!(self = [super init])) return nil;
+  self = [super init];
+  if (!self) return nil;
   _keyCode = keyCode;
   _modifiers = modifiers & kCommonModifiers;
   _modifierKeyCodes = [keyCodes copy];
@@ -137,8 +154,8 @@ static NSString *KeyName(NSInteger keyCode) {
 #pragma mark - Monitor
 
 @implementation ShortcutMonitor {
-  void (^_pressed)(void);
-  void (^_released)(void);
+  void (^_pressed)();
+  void (^_released)();
   HotKey *_hotKey;
   id _globalMonitor;
   id _localMonitor;
@@ -146,8 +163,9 @@ static NSString *KeyName(NSInteger keyCode) {
   BOOL _modifiersDown;
 }
 
-- (instancetype)initWithPressed:(void (^)(void))pressed released:(void (^)(void))released {
-  if (!(self = [super init])) return nil;
+- (instancetype)initWithPressed:(void (^)())pressed released:(void (^)())released {
+  self = [super init];
+  if (!self) return nil;
   _pressed = [pressed copy];
   _released = [released copy];
   NSNotificationCenter *center = NSNotificationCenter.defaultCenter;

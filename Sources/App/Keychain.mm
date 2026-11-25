@@ -2,10 +2,12 @@
 
 #import <Security/Security.h>
 
+#import "Defaults.h"
+
 static NSMutableDictionary *Query(NSString *account) {
   return [@{
     (id)kSecClass : (id)kSecClassGenericPassword,
-    (id)kSecAttrService : NSBundle.mainBundle.bundleIdentifier ?: @"Sotto",
+    (id)kSecAttrService : OrEmpty(NSBundle.mainBundle.bundleIdentifier),
     (id)kSecAttrAccount : account,
   } mutableCopy];
 }
@@ -16,6 +18,7 @@ NSString *KeychainRead(NSString *account) {
   CFTypeRef result = nullptr;
   if (SecItemCopyMatching((__bridge CFDictionaryRef)query, &result) != errSecSuccess) return nil;
   NSData *data = CFBridgingRelease(result);
+  if (!data) return nil;
   return [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
 }
 

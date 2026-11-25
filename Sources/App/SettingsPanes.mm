@@ -20,12 +20,17 @@ static NSString *ShortcutModeSummary(NSInteger mode) {
     @"Hold the shortcut while you speak and let go to finish.",
     @"Press the shortcut to start dictating and press it again to finish.",
     @"Press the shortcut twice to start dictating and once to finish.",
-  ][mode];
+  ][static_cast<NSUInteger>(mode)];
 }
 
 #pragma mark - Building blocks
 
 static NSString *DefaultsPath(NSString *key) { return [@"values." stringByAppendingString:key]; }
+
+static NSImage *Symbol(NSString *name, NSString *description) {
+  NSImage *image = [NSImage imageWithSystemSymbolName:name accessibilityDescription:description];
+  return image ? image : [NSImage new];
+}
 
 static NSTextField *Label(NSString *text) { return [NSTextField labelWithString:text]; }
 
@@ -137,7 +142,7 @@ static NSView *StackPane(NSArray<NSView *> *views) {
   [popUp addItemWithTitle:@"System Default"];
   popUp.lastItem.representedObject = @"";
   [popUp.menu addItem:NSMenuItem.separatorItem];
-  NSString *selected = [NSUserDefaults.standardUserDefaults stringForKey:kMicrophoneKey];
+  NSString *selected = OrEmpty([NSUserDefaults.standardUserDefaults stringForKey:kMicrophoneKey]);
   for (AudioInputDevice *device in AudioInputDevice.all) {
     [popUp addItemWithTitle:device.name];
     popUp.lastItem.representedObject = device.uid;
@@ -154,12 +159,12 @@ static NSView *StackPane(NSArray<NSView *> *views) {
 
 - (void)showService {
   RecognizerService *service = RecognizerService.selected;
-  [_service selectItemAtIndex:[RecognizerService.all indexOfObject:service]];
-  _apiKey.stringValue = service.apiKey ?: @"";
+  [_service selectItemWithTitle:service.title];
+  _apiKey.stringValue = OrEmpty(service.apiKey);
 }
 
 - (void)chooseService:(NSPopUpButton *)sender {
-  RecognizerService.selected = RecognizerService.all[sender.indexOfSelectedItem];
+  RecognizerService.selected = RecognizerService.all[static_cast<NSUInteger>(sender.indexOfSelectedItem)];
   [self showService];
 }
 
@@ -183,7 +188,8 @@ static NSView *StackPane(NSArray<NSView *> *views) {
 }
 
 - (void)loadView {
-  _words = [[NSUserDefaults.standardUserDefaults stringArrayForKey:kVocabularyKey] mutableCopy] ?: [NSMutableArray new];
+  NSArray<NSString *> *saved = [NSUserDefaults.standardUserDefaults stringArrayForKey:kVocabularyKey];
+  _words = saved ? [saved mutableCopy] : [NSMutableArray new];
 
   _table = [NSTableView new];
   _table.headerView = nil;
@@ -201,8 +207,8 @@ static NSView *StackPane(NSArray<NSView *> *views) {
   scroll.borderType = NSBezelBorder;
 
   _addRemove = [NSSegmentedControl segmentedControlWithImages:@[
-    [NSImage imageWithSystemSymbolName:@"plus" accessibilityDescription:@"Add Word"],
-    [NSImage imageWithSystemSymbolName:@"minus" accessibilityDescription:@"Remove Word"],
+    Symbol(@"plus", @"Add Word"),
+    Symbol(@"minus", @"Remove Word"),
   ] trackingMode:NSSegmentSwitchTrackingMomentary target:self action:@selector(addOrRemove:)];
   _addRemove.segmentStyle = NSSegmentStyleSmallSquare;
 
@@ -217,7 +223,7 @@ static NSView *StackPane(NSArray<NSView *> *views) {
   [self tableViewSelectionDidChange:[NSNotification notificationWithName:NSTableViewSelectionDidChangeNotification object:_table]];
 }
 
-- (NSInteger)numberOfRowsInTableView:(NSTableView *)tableView { return _words.count; }
+- (NSInteger)numberOfRowsInTableView:(NSTableView *)tableView { return static_cast<NSInteger>(_words.count); }
 
 - (NSView *)tableView:(NSTableView *)tableView viewForTableColumn:(NSTableColumn *)column row:(NSInteger)row {
   NSTableCellView *cell = [tableView makeViewWithIdentifier:@"word" owner:self];
@@ -238,7 +244,7 @@ static NSView *StackPane(NSArray<NSView *> *views) {
       [field.centerYAnchor constraintEqualToAnchor:cell.centerYAnchor],
     ]];
   }
-  cell.textField.stringValue = _words[row];
+  cell.textField.stringValue = _words[static_cast<NSUInteger>(row)];
   return cell;
 }
 
@@ -249,9 +255,10 @@ static NSView *StackPane(NSArray<NSView *> *views) {
 - (void)addOrRemove:(NSSegmentedControl *)sender {
   if (sender.selectedSegment == 0) {
     [_words addObject:@""];
-    const NSInteger row = _words.count - 1;
-    [_table insertRowsAtIndexes:[NSIndexSet indexSetWithIndex:row] withAnimation:NSTableViewAnimationEffectNone];
-    [_table selectRowIndexes:[NSIndexSet indexSetWithIndex:row] byExtendingSelection:NO];
+    const NSUInteger index = _words.count - 1;
+    const auto row = static_cast<NSInteger>(index);
+    [_table insertRowsAtIndexes:[NSIndexSet indexSetWithIndex:index] withAnimation:NSTableViewAnimationEffectNone];
+    [_table selectRowIndexes:[NSIndexSet indexSetWithIndex:index] byExtendingSelection:NO];
     [_table scrollRowToVisible:row];
     [_table editColumn:0 row:row withEvent:nil select:YES];
   } else {
@@ -265,12 +272,13 @@ static NSView *StackPane(NSArray<NSView *> *views) {
 - (void)wordEdited:(NSTextField *)sender {
   const NSInteger row = [_table rowForView:sender];
   if (row < 0) return;
+  const auto index = static_cast<NSUInteger>(row);
   NSString *word = [sender.stringValue stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
   if (word.length == 0) {
-    [_words removeObjectAtIndex:row];
-    [_table removeRowsAtIndexes:[NSIndexSet indexSetWithIndex:row] withAnimation:NSTableViewAnimationEffectNone];
+    [_words removeObjectAtIndex:index];
+    [_table removeRowsAtIndexes:[NSIndexSet indexSetWithIndex:index] withAnimation:NSTableViewAnimationEffectNone];
   } else {
-    _words[row] = word;
+    _words[index] = word;
   }
   [self save];
 }
@@ -290,14 +298,15 @@ static NSView *StackPane(NSArray<NSView *> *views) {
 }
 
 - (void)loadView {
-  NSImageView *icon = [NSImageView imageViewWithImage:[NSImage imageWithSystemSymbolName:@"hand.raised.fill" accessibilityDescription:nil]];
+  NSImageView *icon = [NSImageView new];
+  icon.image = [NSImage imageWithSystemSymbolName:@"hand.raised.fill" accessibilityDescription:nil];
   icon.symbolConfiguration = [NSImageSymbolConfiguration configurationWithPointSize:30 weight:NSFontWeightRegular];
   icon.contentTintColor = NSColor.controlAccentColor;
   [icon.widthAnchor constraintEqualToConstant:40].active = YES;
 
   NSTextField *title = _title = Label(@"");
   title.font = [NSFont systemFontOfSize:NSFont.systemFontSize weight:NSFontWeightSemibold];
-  NSTextField *body = _summary = [NSTextField wrappingLabelWithString:RecognizerService.all.firstObject.privacySummary];
+  NSTextField *body = _summary = [NSTextField wrappingLabelWithString:RecognizerService.selected.privacySummary];
   [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(showService) name:NSUserDefaultsDidChangeNotification object:nil];
   body.textColor = NSColor.secondaryLabelColor;
   body.preferredMaxLayoutWidth = kPaneWidth - 2 * kMargin - 52;
@@ -336,7 +345,9 @@ static NSView *StackPane(NSArray<NSView *> *views) {
   alert.informativeText = @"You can’t undo this action.";
   [alert addButtonWithTitle:@"Clear"].hasDestructiveAction = YES;
   [alert addButtonWithTitle:@"Cancel"];
-  [alert beginSheetModalForWindow:self.view.window completionHandler:^(NSModalResponse response) {
+  NSWindow *window = self.view.window;
+  if (!window) return;
+  [alert beginSheetModalForWindow:window completionHandler:^(NSModalResponse response) {
     if (response == NSAlertFirstButtonReturn) [NSApp sendAction:NSSelectorFromString(@"clearRecents:") to:nil from:self];
   }];
 }

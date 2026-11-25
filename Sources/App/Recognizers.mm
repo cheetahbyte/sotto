@@ -9,11 +9,11 @@ using Factory = std::unique_ptr<sotto::Recognizer> (*)(RecognizerService *servic
 static std::unique_ptr<sotto::Recognizer> MakeOpenAIRealtime(RecognizerService *service) {
   NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
   OpenAIRealtimeRecognizer::Options options;
-  options.api_key = (service.apiKey ?: @"").UTF8String;
-  options.input_device_uid = ([defaults stringForKey:kMicrophoneKey] ?: @"").UTF8String;
-  options.language = SottoLanguageCode([defaults stringForKey:kLanguageKey]).UTF8String;
-  for (NSString *word in [defaults stringArrayForKey:kVocabularyKey]) options.keywords.push_back(word.UTF8String);
-  return std::make_unique<OpenAIRealtimeRecognizer>(std::move(options));
+  options.api_key = StdString(service.apiKey);
+  options.input_device_uid = StdString([defaults stringForKey:kMicrophoneKey]);
+  options.language = StdString(SottoLanguageCode([defaults stringForKey:kLanguageKey]));
+  for (NSString *word in [defaults stringArrayForKey:kVocabularyKey]) options.keywords.push_back(StdString(word));
+  return std::make_unique<OpenAIRealtimeRecognizer>(options);
 }
 
 @implementation RecognizerService {
@@ -51,7 +51,7 @@ static std::unique_ptr<sotto::Recognizer> MakeOpenAIRealtime(RecognizerService *
 + (RecognizerService *)selected {
   NSString *identifier = [NSUserDefaults.standardUserDefaults stringForKey:kServiceKey];
   for (RecognizerService *service in self.all) {
-    if ([service.identifier isEqualToString:identifier]) return service;
+    if (identifier && [service.identifier isEqualToString:identifier]) return service;
   }
   return self.all.firstObject;
 }

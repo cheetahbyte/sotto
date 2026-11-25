@@ -10,7 +10,7 @@
 #include "Recognizer.hpp"
 
 namespace sotto {
-enum class TransitionError { AlreadyActive, NotListening };
+enum class TransitionError : std::uint8_t { AlreadyActive, NotListening };
 
 struct Idle {};
 struct Listening {
@@ -38,6 +38,9 @@ class Session final : private Recognizer::Listener {
   Session() = default;
   Session(const Session&) = delete;
   Session& operator=(const Session&) = delete;
+  Session(Session&&) = delete;
+  Session& operator=(Session&&) = delete;
+  ~Session() = default;
 
   auto start(std::unique_ptr<Recognizer> recognizer) -> std::expected<void, TransitionError>;
   auto stop() -> std::expected<void, TransitionError>;

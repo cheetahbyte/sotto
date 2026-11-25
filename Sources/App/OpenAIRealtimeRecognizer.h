@@ -16,7 +16,11 @@ class OpenAIRealtimeRecognizer final : public sotto::Recognizer {
     std::string input_device_uid;
   };
 
-  explicit OpenAIRealtimeRecognizer(Options options);
+  explicit OpenAIRealtimeRecognizer(const Options& options);
+  OpenAIRealtimeRecognizer(const OpenAIRealtimeRecognizer&) = delete;
+  OpenAIRealtimeRecognizer& operator=(const OpenAIRealtimeRecognizer&) = delete;
+  OpenAIRealtimeRecognizer(OpenAIRealtimeRecognizer&&) = delete;
+  OpenAIRealtimeRecognizer& operator=(OpenAIRealtimeRecognizer&&) = delete;
   ~OpenAIRealtimeRecognizer() override;
 
   void start(Listener& listener) override;

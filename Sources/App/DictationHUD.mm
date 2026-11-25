@@ -15,7 +15,7 @@ static const CGFloat kCompactWidth = kLeading + kIndicatorSize + kLeading;
 static const CGFloat kMaxWidth = 560;
 static const CGFloat kBottomMargin = 28;
 static const CGFloat kSlideDistance = 10;
-static const NSSize kPanelSize = {kMaxWidth + 80, kHeight + kBottomMargin + 48};
+static const NSSize kPanelSize = {.width = kMaxWidth + 80, .height = kHeight + kBottomMargin + 48};
 
 static BOOL ReduceMotion() { return NSWorkspace.sharedWorkspace.accessibilityDisplayShouldReduceMotion; }
 
@@ -34,16 +34,19 @@ static BOOL ReduceMotion() { return NSWorkspace.sharedWorkspace.accessibilityDis
   static constexpr std::array<CGFloat, 5> kWeight = {0.55, 0.85, 1.0, 0.8, 0.5};
   const CFTimeInterval t = CACurrentMediaTime();
   for (size_t i = 0; i < _bars.size(); ++i) {
-    const CGFloat ripple = ReduceMotion() ? 0.85 : 0.7 + 0.3 * std::sin(t * (9.0 + 2.3 * i) + 1.7 * i);
-    const CGFloat target = std::clamp<CGFloat>(level * kWeight[i] * ripple * 1.25, 0, 1);
-    _bars[i] += (target - _bars[i]) * 0.35;
+    const auto phase = static_cast<CGFloat>(i);
+    const CGFloat ripple = ReduceMotion() ? 0.85 : 0.7 + 0.3 * std::sin(t * (9.0 + 2.3 * phase) + 1.7 * phase);
+    const CGFloat target = std::clamp<CGFloat>(level * kWeight.at(i) * ripple * 1.25, 0, 1);
+    CGFloat &bar = _bars.at(i);
+    bar += (target - bar) * 0.35;
   }
   self.needsDisplay = YES;
 }
 
 - (void)drawRect:(NSRect)dirtyRect {
   const CGFloat barWidth = 3, spacing = 2.5, minHeight = 3;
-  const CGFloat total = _bars.size() * barWidth + (_bars.size() - 1) * spacing;
+  const auto count = static_cast<CGFloat>(_bars.size());
+  const CGFloat total = count * barWidth + (count - 1) * spacing;
   CGFloat x = NSMidX(self.bounds) - total / 2;
   [NSColor.labelColor setFill];
   for (CGFloat bar : _bars) {
@@ -75,7 +78,8 @@ static BOOL ReduceMotion() { return NSWorkspace.sharedWorkspace.accessibilityDis
 }
 
 - (instancetype)init {
-  if (!(self = [super init])) return nil;
+  self = [super init];
+  if (!self) return nil;
 
   _panel = [[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, kPanelSize.width, kPanelSize.height)
                                       styleMask:NSWindowStyleMaskBorderless | NSWindowStyleMaskNonactivatingPanel
@@ -242,7 +246,7 @@ static BOOL ReduceMotion() { return NSWorkspace.sharedWorkspace.accessibilityDis
 
   [NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
     context.duration = appearing ? 0.35 : 0.25;
-    context.timingFunction = appearing ? [CAMediaTimingFunction functionWithControlPoints:0.2 :0.9 :0.3 :1.0]
+    context.timingFunction = appearing ? [CAMediaTimingFunction functionWithControlPoints:0.2f :0.9f :0.3f :1.0f]
                                        : [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseOut];
     context.allowsImplicitAnimation = YES;
     for (NSView *view in @[ self->_waveform, self->_spinner, self->_symbol ]) view.animator.alphaValue = view == indicator;

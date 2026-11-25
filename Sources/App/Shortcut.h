@@ -24,7 +24,7 @@ NSArray<NSNumber *> *ModifierKeyCodesDown(NSEventModifierFlags flags);
 NSString *ModifierKeysDisplayString(NSArray<NSNumber *> *keyCodes);
 
 @interface ShortcutMonitor : NSObject
-- (instancetype)initWithPressed:(void (^)(void))pressed released:(void (^)(void))released;
+- (instancetype)initWithPressed:(void (^)())pressed released:(void (^)())released;
 @end
 
 NS_ASSUME_NONNULL_END

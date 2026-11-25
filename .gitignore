@@ -37,3 +37,4 @@ DerivedData/
 
 # macOS
 .DS_Store
+build-*/

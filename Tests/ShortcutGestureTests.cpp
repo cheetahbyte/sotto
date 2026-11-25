@@ -10,12 +10,15 @@ using namespace std::chrono_literals;
 using enum GestureCommand;
 
 namespace {
-int failures = 0;
+int& failures() {
+  static int count = 0;
+  return count;
+}
 
 void expect(GestureCommand got, GestureCommand want, std::string_view what,
             std::source_location at = std::source_location::current()) {
   if (got == want) return;
-  ++failures;
+  ++failures();
   std::println(stderr, "FAIL line {}: {} (got {}, want {})", at.line(), what, static_cast<int>(got),
                static_cast<int>(want));
 }
@@ -100,13 +103,17 @@ void changing_mode_resets() {
 }
 
 int main() {
-  hold_mode();
-  tap_mode();
-  hold_or_double_tap_hold();
-  hold_or_double_tap_double_tap();
-  hold_or_double_tap_single_tap_cancels();
-  double_tap_mode();
-  changing_mode_resets();
-  if (failures == 0) std::println("all shortcut gesture tests passed");
-  return failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+  try {
+    hold_mode();
+    tap_mode();
+    hold_or_double_tap_hold();
+    hold_or_double_tap_double_tap();
+    hold_or_double_tap_single_tap_cancels();
+    double_tap_mode();
+    changing_mode_resets();
+    if (failures() == 0) std::println("all shortcut gesture tests passed");
+    return failures() == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+  } catch (...) {
+    return EXIT_FAILURE;
+  }
 }

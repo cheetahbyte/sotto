@@ -2,9 +2,11 @@
 
 #import <Carbon/Carbon.h>
 
+#include <array>
+
 @interface HotKey ()
-@property(nonatomic, copy) void (^pressed)(void);
-@property(nonatomic, copy, nullable) void (^released)(void);
+@property(nonatomic, copy) void (^pressed)();
+@property(nonatomic, copy, nullable) void (^released)();
 @end
 
 static NSMapTable<NSNumber *, HotKey *> *Registry() {
@@ -31,15 +33,18 @@ static OSStatus HandleHotKey(EventHandlerCallRef, EventRef event, void *) {
 
 - (instancetype)initWithKeyCode:(uint32_t)keyCode
                       modifiers:(uint32_t)modifiers
-                        pressed:(void (^)(void))pressed
-                       released:(void (^)(void))released {
-  if (!(self = [super init])) return nil;
+                        pressed:(void (^)())pressed
+                       released:(void (^)())released {
+  self = [super init];
+  if (!self) return nil;
 
   static dispatch_once_t once;
   dispatch_once(&once, ^{
-    const EventTypeSpec kinds[] = {{kEventClassKeyboard, kEventHotKeyPressed},
-                                   {kEventClassKeyboard, kEventHotKeyReleased}};
-    InstallApplicationEventHandler(&HandleHotKey, 2, kinds, nullptr, nullptr);
+    const std::array<EventTypeSpec, 2> kinds = {{
+        {.eventClass = kEventClassKeyboard, .eventKind = kEventHotKeyPressed},
+        {.eventClass = kEventClassKeyboard, .eventKind = kEventHotKeyReleased},
+    }};
+    InstallApplicationEventHandler(&HandleHotKey, kinds.size(), kinds.data(), nullptr, nullptr);
   });
 
   static uint32_t nextID = 1;

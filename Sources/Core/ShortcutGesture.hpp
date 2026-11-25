@@ -1,17 +1,18 @@
 #pragma once
 
 #include <chrono>
+#include <cstdint>
 #include <variant>
 
 namespace sotto {
-enum class ShortcutMode {
+enum class ShortcutMode : std::uint8_t {
   HoldOrDoubleTap,
   Hold,
   Tap,
   DoubleTap,
 };
 
-enum class GestureCommand { None, Start, Finish, Cancel };
+enum class GestureCommand : std::uint8_t { None, Start, Finish, Cancel };
 
 class ShortcutGesture {
  public:
