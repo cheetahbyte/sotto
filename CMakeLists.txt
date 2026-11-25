@@ -9,9 +9,7 @@ set(CMAKE_OBJCXX_STANDARD 23)
 set(CMAKE_OBJCXX_STANDARD_REQUIRED ON)
 add_compile_options(-Wall -Wextra)
 
-# Portable C++23 model of a dictation session. No Apple headers.
-add_library(SottoCore STATIC Sources/Core/Session.cpp Sources/Core/ScriptedRecognizer.cpp
-  Sources/Core/ShortcutGesture.cpp)
+add_library(SottoCore STATIC Sources/Core/Session.cpp Sources/Core/ShortcutGesture.cpp)
 target_include_directories(SottoCore PUBLIC Sources/Core)
 
 file(GLOB SOTTO_SOUNDS CONFIGURE_DEPENDS Resources/Sounds/*.wav Resources/Sounds/LICENSE-Hex.txt)
@@ -22,18 +20,20 @@ add_executable(Sotto MACOSX_BUNDLE
   Sources/App/AudioInput.mm
   Sources/App/DictationController.mm
   Sources/App/DictationHUD.mm
+  Sources/App/FeedbackSound.mm
   Sources/App/HotKey.mm
   Sources/App/Keychain.mm
+  Sources/App/MicrophoneCapture.mm
   Sources/App/OpenAIRealtimeRecognizer.mm
   Sources/App/Recognizers.mm
   Sources/App/Shortcut.mm
-  Sources/App/ShortcutViews.mm
+  Sources/App/ShortcutRecorderView.mm
   Sources/App/StatusItemController.mm
   Sources/App/TextInserter.mm
+  Sources/App/SettingsPanes.mm
   Sources/App/SettingsWindowController.mm
   Sources/App/WelcomeWindowController.mm
   ${SOTTO_SOUNDS})
-# The license travels with the sounds, as its terms require.
 set_source_files_properties(${SOTTO_SOUNDS} PROPERTIES MACOSX_PACKAGE_LOCATION Resources/Sounds)
 target_compile_options(Sotto PRIVATE -fobjc-arc)
 target_link_libraries(Sotto PRIVATE SottoCore
@@ -42,9 +42,6 @@ target_link_libraries(Sotto PRIVATE SottoCore
 set_target_properties(Sotto PROPERTIES
   MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/Resources/Info.plist.in)
 
-# Ad-hoc signatures change with every build, and macOS then asks again for
-# keychain and microphone access. A real identity keeps both, for example
-#   cmake -B build -DSOTTO_CODESIGN_IDENTITY="Apple Development"
 set(SOTTO_CODESIGN_IDENTITY "-" CACHE STRING "Identity for codesign; - signs ad hoc")
 add_custom_command(TARGET Sotto POST_BUILD
   COMMAND codesign --force --sign "${SOTTO_CODESIGN_IDENTITY}" --identifier com.example.Sotto

@@ -10,7 +10,6 @@ using namespace std::chrono_literals;
 using enum GestureCommand;
 
 namespace {
-
 int failures = 0;
 
 void expect(GestureCommand got, GestureCommand want, std::string_view what,
@@ -43,7 +42,6 @@ void tap_mode() {
   expect(g.press(6s, true), Finish, "second tap finishes");
   expect(g.release(6.1s), None, "release does nothing");
   expect(g.press(7s, false), Start, "third tap starts again");
-  // The session ended by itself (silence, Escape); the next tap starts a new one.
   expect(g.press(20s, false), Start, "tap after the session ended starts a new one");
 }
 
@@ -99,7 +97,7 @@ void changing_mode_resets() {
   expect(g.press(2s, false), Start, "and the new mode starts from idle");
 }
 
-}  // namespace
+}
 
 int main() {
   hold_mode();

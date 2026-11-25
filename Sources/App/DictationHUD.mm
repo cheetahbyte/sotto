@@ -15,13 +15,12 @@ static const CGFloat kCompactWidth = kLeading + kIndicatorSize + kLeading;
 static const CGFloat kMaxWidth = 560;
 static const CGFloat kBottomMargin = 28;
 static const CGFloat kSlideDistance = 10;
-static const NSSize kPanelSize = {kMaxWidth + 80, kHeight + kBottomMargin + 48};  // room for the glass shadow
+static const NSSize kPanelSize = {kMaxWidth + 80, kHeight + kBottomMargin + 48};
 
 static BOOL ReduceMotion() { return NSWorkspace.sharedWorkspace.accessibilityDisplayShouldReduceMotion; }
 
 #pragma mark - Waveform
 
-// Five capsule bars that follow the input level.
 @interface WaveformView : NSView
 @property(nonatomic) CGFloat level;
 @end
@@ -35,7 +34,6 @@ static BOOL ReduceMotion() { return NSWorkspace.sharedWorkspace.accessibilityDis
   static constexpr std::array<CGFloat, 5> kWeight = {0.55, 0.85, 1.0, 0.8, 0.5};
   const CFTimeInterval t = CACurrentMediaTime();
   for (size_t i = 0; i < _bars.size(); ++i) {
-    // Reduce Motion keeps the level feedback but drops the decorative ripple.
     const CGFloat ripple = ReduceMotion() ? 0.85 : 0.7 + 0.3 * std::sin(t * (9.0 + 2.3 * i) + 1.7 * i);
     const CGFloat target = std::clamp<CGFloat>(level * kWeight[i] * ripple * 1.25, 0, 1);
     _bars[i] += (target - _bars[i]) * 0.35;
@@ -73,7 +71,7 @@ static BOOL ReduceMotion() { return NSWorkspace.sharedWorkspace.accessibilityDis
   NSImageView *_symbol;
   NSTextField *_label;
   BOOL _visible;
-  NSUInteger _generation;  // invalidates a pending hide when shown again
+  NSUInteger _generation;
 }
 
 - (instancetype)init {
@@ -103,12 +101,9 @@ static BOOL ReduceMotion() { return NSWorkspace.sharedWorkspace.accessibilityDis
   _symbol.contentTintColor = NSColor.labelColor;
 
   _label = [NSTextField labelWithString:@""];
-  _label.lineBreakMode = NSLineBreakByTruncatingHead;  // keep the newest words visible
+  _label.lineBreakMode = NSLineBreakByTruncatingHead;
   _label.maximumNumberOfLines = 1;
   _label.translatesAutoresizingMaskIntoConstraints = NO;
-  // The label takes its final width at once and this view clips it, so
-  // new words are revealed as the capsule grows instead of flickering
-  // through an ellipsis.
   NSView *labelClip = [NSView new];
   labelClip.clipsToBounds = YES;
   [labelClip addSubview:_label];
@@ -134,7 +129,7 @@ static BOOL ReduceMotion() { return NSWorkspace.sharedWorkspace.accessibilityDis
     [content addSubview:view];
   }
   NSLayoutConstraint *clipTrailing = [labelClip.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-kTrailing];
-  clipTrailing.priority = NSLayoutPriorityDefaultHigh;  // yields while the capsule is compact
+  clipTrailing.priority = NSLayoutPriorityDefaultHigh;
   [NSLayoutConstraint activateConstraints:@[
     [indicator.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:kLeading],
     [indicator.centerYAnchor constraintEqualToAnchor:content.centerYAnchor],
@@ -177,7 +172,6 @@ static BOOL ReduceMotion() { return NSWorkspace.sharedWorkspace.accessibilityDis
 - (void)showListeningWithFinalized:(NSString *)finalized tentative:(NSString *)tentative {
   NSMutableAttributedString *text = [self text:finalized color:NSColor.labelColor];
   if (finalized.length && tentative.length) [text appendAttributedString:[self text:@" " color:NSColor.labelColor]];
-  // Words the recognizer may still revise are dimmer.
   [text appendAttributedString:[self text:tentative color:NSColor.secondaryLabelColor]];
   [self showIndicator:_waveform text:text];
 }
@@ -259,7 +253,6 @@ static BOOL ReduceMotion() { return NSWorkspace.sharedWorkspace.accessibilityDis
   }];
 }
 
-// Bottom center of the screen people are working on, above the Dock.
 - (void)positionOnActiveScreen {
   NSScreen *screen = NSScreen.mainScreen;
   const NSPoint mouse = NSEvent.mouseLocation;

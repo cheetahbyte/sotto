@@ -1,29 +1,16 @@
-#import "ShortcutViews.h"
+#import "ShortcutRecorderView.h"
 
 #import <Carbon/Carbon.h>
 
 #import "Shortcut.h"
-
-NSArray<NSString *> *ShortcutModeTitles(void) {
-  return @[ @"Hold or Double-Tap", @"Hold", @"Tap", @"Double-Tap" ];
-}
-
-NSString *ShortcutModeSummary(NSInteger mode) {
-  return @[
-    @"Hold the shortcut while you speak, or press it twice to dictate hands-free.",
-    @"Hold the shortcut while you speak and let go to finish.",
-    @"Press the shortcut to start dictating and press it again to finish.",
-    @"Press the shortcut twice to start dictating and once to finish.",
-  ][mode];
-}
 
 static const CGFloat kInset = 8;
 static const CGFloat kCancelSize = 14;
 
 @implementation ShortcutRecorderView {
   BOOL _recording;
-  NSArray<NSNumber *> *_heldModifiers;  // down right now
-  NSArray<NSNumber *> *_peakModifiers;  // the most held at once since recording began
+  NSArray<NSNumber *> *_heldModifiers;
+  NSArray<NSNumber *> *_peakModifiers;
 }
 
 - (instancetype)initWithFrame:(NSRect)frame {
@@ -39,9 +26,8 @@ static const CGFloat kCancelSize = 14;
 - (void)shortcutDidChange:(NSNotification *)notification { self.needsDisplay = YES; }
 
 - (NSSize)intrinsicContentSize { return NSMakeSize(190, 24); }
-- (CGFloat)firstBaselineOffsetFromTop { return 16.5; }  // lines the text up with the form label
+- (CGFloat)firstBaselineOffsetFromTop { return 16.5; }
 - (BOOL)acceptsFirstResponder { return YES; }
-// Like buttons, in the Tab order only with Keyboard Navigation turned on.
 - (BOOL)canBecomeKeyView { return NSApp.fullKeyboardAccessEnabled; }
 - (id)accessibilityValue { return _recording ? @"Recording" : Shortcut.current.displayString; }
 - (BOOL)accessibilityPerformPress {
@@ -67,7 +53,6 @@ static const CGFloat kCancelSize = 14;
   NSString *text = Shortcut.current.displayString;
   NSColor *color = NSColor.labelColor;
   if (_recording) {
-    // While recording, show the modifiers held so far.
     text = _heldModifiers.count ? [ModifierKeysDisplayString(_heldModifiers) stringByAppendingString:@" …"] : @"Type shortcut";
     color = _heldModifiers.count ? NSColor.labelColor : NSColor.placeholderTextColor;
 
@@ -122,22 +107,17 @@ static const CGFloat kCancelSize = 14;
   const NSEventModifierFlags modifiers = event.modifierFlags &
       (NSEventModifierFlagControl | NSEventModifierFlagOption | NSEventModifierFlagShift | NSEventModifierFlagCommand);
   if (event.keyCode == kVK_Escape && !modifiers) return [self endRecordingSaving:nil];
-  // A plain key would fire while typing, so a shortcut needs a modifier.
-  // Function keys are the exception.
   const BOOL functionKey = (event.modifierFlags & NSEventModifierFlagFunction) && event.keyCode >= kVK_F5;
   if (!modifiers && !functionKey) return NSBeep();
   [self endRecordingSaving:[Shortcut shortcutWithKeyCode:event.keyCode modifiers:modifiers]];
 }
 
-// Command combinations arrive here before the menus see them.
 - (BOOL)performKeyEquivalent:(NSEvent *)event {
   if (!_recording || event.type != NSEventTypeKeyDown) return [super performKeyEquivalent:event];
   [self keyDown:event];
   return YES;
 }
 
-// Modifier keys pressed and let go without another key make a
-// modifier-only shortcut out of the keys that were down together.
 - (void)flagsChanged:(NSEvent *)event {
   if (!_recording) return [super flagsChanged:event];
   _heldModifiers = ModifierKeyCodesDown(event.modifierFlags);

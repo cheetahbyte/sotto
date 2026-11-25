@@ -15,10 +15,9 @@ static const NSEventModifierFlags kCommonModifiers =
 namespace {
 struct ModifierKey {
   NSInteger keyCode;
-  NSUInteger deviceFlag;  // the per-key bit in an event's raw modifier flags
+  NSUInteger deviceFlag;
   NSString *label;
 };
-// Display order: Control, Option, Shift, Command, as in menus.
 const ModifierKey kModifierKeys[] = {
     {kVK_Function, NSEventModifierFlagFunction, @"Fn"},
     {kVK_Control, 0x0001, @"Left Control"}, {kVK_RightControl, 0x2000, @"Right Control"},
@@ -26,7 +25,7 @@ const ModifierKey kModifierKeys[] = {
     {kVK_Shift, 0x0002, @"Left Shift"},     {kVK_RightShift, 0x0004, @"Right Shift"},
     {kVK_Command, 0x0008, @"Left Command"}, {kVK_RightCommand, 0x0010, @"Right Command"},
 };
-}  // namespace
+}
 
 NSArray<NSNumber *> *ModifierKeyCodesDown(NSEventModifierFlags flags) {
   NSMutableArray *down = [NSMutableArray new];
@@ -44,7 +43,6 @@ NSString *ModifierKeysDisplayString(NSArray<NSNumber *> *keyCodes) {
   return [names componentsJoinedByString:@" + "];
 }
 
-// The name printed on a key in the current keyboard layout.
 static NSString *KeyName(NSInteger keyCode) {
   static NSDictionary<NSNumber *, NSString *> *named = @{
     @(kVK_Space) : @"Space", @(kVK_Return) : @"↩", @(kVK_Tab) : @"⇥", @(kVK_Delete) : @"⌫",
@@ -141,8 +139,8 @@ static NSString *KeyName(NSInteger keyCode) {
 @implementation ShortcutMonitor {
   void (^_pressed)(void);
   void (^_released)(void);
-  HotKey *_hotKey;        // for a shortcut with a key
-  id _globalMonitor;      // for modifier-only shortcuts
+  HotKey *_hotKey;
+  id _globalMonitor;
   id _localMonitor;
   NSSet<NSNumber *> *_wantedModifiers;
   BOOL _modifiersDown;
@@ -189,7 +187,6 @@ static NSString *KeyName(NSInteger keyCode) {
     return;
   }
 
-  // Carbon hot keys need a key, so watch modifier changes instead.
   _wantedModifiers = [NSSet setWithArray:shortcut.modifierKeyCodes];
   _globalMonitor = [NSEvent addGlobalMonitorForEventsMatchingMask:NSEventMaskFlagsChanged handler:^(NSEvent *event) {
     [weakSelf modifiersChanged:event.modifierFlags];

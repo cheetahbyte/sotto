@@ -24,8 +24,6 @@ static NSStackView *VStack(NSArray<NSView *> *views, CGFloat spacing, NSLayoutAt
   return stack;
 }
 
-// Symbol, bold title, and a secondary description. `accessory` sits at
-// the trailing edge when given.
 static NSView *Row(NSString *symbol, NSString *title, NSString *body, NSView *accessory) {
   NSImageView *icon = Symbol(symbol, 26, NSFontWeightRegular);
   [icon.widthAnchor constraintEqualToConstant:40].active = YES;
@@ -58,7 +56,7 @@ static NSView *Row(NSString *symbol, NSString *title, NSString *body, NSView *ac
                                                            NSWindowStyleMaskFullSizeContentView
                                                    backing:NSBackingStoreBuffered
                                                      defer:YES];
-  window.title = @"Welcome to Sotto";  // for VoiceOver and Mission Control
+  window.title = @"Welcome to Sotto";
   window.titleVisibility = NSWindowTitleHidden;
   window.titlebarAppearsTransparent = YES;
   window.movableByWindowBackground = YES;
@@ -171,8 +169,6 @@ static NSView *Row(NSString *symbol, NSString *title, NSString *body, NSView *ac
   return button;
 }
 
-// macOS grants this one in System Settings, so the button leads there
-// and shows the result when Sotto becomes active again.
 - (NSButton *)accessibilityButton {
   NSButton *button = [NSButton buttonWithTitle:@"Allow" target:TextInserter.class action:@selector(requestPermission)];
   [button.widthAnchor constraintGreaterThanOrEqualToConstant:64].active = YES;
@@ -191,8 +187,6 @@ static NSView *Row(NSString *symbol, NSString *title, NSString *body, NSView *ac
   return button;
 }
 
-// Shows the system's microphone alert the first time. After a refusal
-// only System Settings can change the answer, so go there.
 - (void)allow:(NSButton *)sender {
   if ([AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeAudio] == AVAuthorizationStatusDenied) {
     [NSWorkspace.sharedWorkspace openURL:[NSURL URLWithString:@"x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"]];

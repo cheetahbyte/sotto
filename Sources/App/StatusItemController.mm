@@ -6,6 +6,8 @@
 #import "DictationController.h"
 #import "Shortcut.h"
 
+static const NSUInteger kRecentTitleLength = 48;
+
 @interface StatusItemController () <NSMenuDelegate>
 @end
 
@@ -43,7 +45,6 @@
 }
 
 - (void)dictationDidChange:(NSNotification *)notification {
-  // A template symbol, so the system colors it for any menu bar.
   NSImage *image = [NSImage imageWithSystemSymbolName:_dictation.active ? @"mic.fill" : @"mic"
                              accessibilityDescription:_dictation.active ? @"Sotto, listening" : @"Sotto"];
   _item.button.image = image;
@@ -53,68 +54,66 @@
 
 - (void)menuNeedsUpdate:(NSMenu *)menu {
   [menu removeAllItems];
-  NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
-
-  NSMenuItem *toggle = [self item:_dictation.active ? @"Stop Dictation" : @"Start Dictation" action:@selector(toggleDictation:)];
-  toggle.keyEquivalent = Shortcut.current.menuKeyEquivalent;
-  toggle.keyEquivalentModifierMask = Shortcut.current.modifiers;
-  [menu addItem:toggle];
+  [menu addItem:[self toggleItem]];
   [menu addItem:NSMenuItem.separatorItem];
-
-  [menu addItem:[self choiceMenu:@"Language" titles:SottoLanguages() key:kLanguageKey]];
+  [menu addItem:[self languageMenu]];
   [menu addItem:[self microphoneMenu]];
-
-  NSMenuItem *recent = [self item:@"Recent" action:nil];
-  recent.submenu = [NSMenu new];
-  for (NSString *text in _dictation.recents) {
-    NSString *title = text.length > 48 ? [[text substringToIndex:47] stringByAppendingString:@"…"] : text;
-    NSMenuItem *entry = [self item:title action:@selector(copyRecent:)];
-    entry.representedObject = text;
-    entry.toolTip = @"Copy to Clipboard";
-    [recent.submenu addItem:entry];
-  }
-  if (_dictation.recents.count) [recent.submenu addItem:NSMenuItem.separatorItem];
-  [recent.submenu addItem:[self item:@"Clear Menu" action:_dictation.recents.count ? @selector(clearRecents:) : nil]];
-  recent.submenu.autoenablesItems = NO;
-  recent.submenu.itemArray.lastObject.enabled = _dictation.recents.count > 0;
-  recent.hidden = ![defaults boolForKey:kKeepRecentsKey];
-  [menu addItem:recent];
+  [menu addItem:[self recentMenu]];
   [menu addItem:NSMenuItem.separatorItem];
-
-  NSMenuItem *settings = [[NSMenuItem alloc] initWithTitle:@"Settings…" action:@selector(showSettings:) keyEquivalent:@","];
-  settings.target = NSApp.delegate;
-  [menu addItem:settings];
-
-  // Not part of the design: shortcuts to states that are otherwise hard to reach.
-  NSMenuItem *mockup = [self item:@"Mockup" action:nil];
-  mockup.submenu = [NSMenu new];
-  NSMenuItem *welcome = [[NSMenuItem alloc] initWithTitle:@"Show Welcome Window" action:@selector(showWelcome:) keyEquivalent:@""];
-  welcome.target = NSApp.delegate;
-  [mockup.submenu addItem:welcome];
-  [mockup.submenu addItem:[self item:@"Show Microphone Error" action:@selector(showFailure:)]];
-  [menu addItem:mockup];
+  [menu addItem:[self settingsItem]];
   [menu addItem:NSMenuItem.separatorItem];
-
   [menu addItemWithTitle:@"Quit Sotto" action:@selector(terminate:) keyEquivalent:@"q"];
+}
+
+- (NSMenuItem *)toggleItem {
+  NSMenuItem *item = [self item:_dictation.active ? @"Stop Dictation" : @"Start Dictation" action:@selector(toggleDictation:)];
+  item.keyEquivalent = Shortcut.current.menuKeyEquivalent;
+  item.keyEquivalentModifierMask = Shortcut.current.modifiers;
+  return item;
+}
+
+- (NSMenuItem *)settingsItem {
+  NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:@"Settings…" action:@selector(showSettings:) keyEquivalent:@","];
+  item.target = NSApp.delegate;
+  return item;
+}
+
+- (NSMenuItem *)recentMenu {
+  NSArray<NSString *> *recents = _dictation.recents;
+  NSMenuItem *parent = [self item:@"Recent" action:nil];
+  parent.hidden = ![NSUserDefaults.standardUserDefaults boolForKey:kKeepRecentsKey];
+  parent.submenu = [NSMenu new];
+  parent.submenu.autoenablesItems = NO;
+  for (NSString *text in recents) {
+    NSString *title = text.length > kRecentTitleLength ? [[text substringToIndex:kRecentTitleLength - 1] stringByAppendingString:@"…"] : text;
+    NSMenuItem *item = [self item:title action:@selector(copyRecent:)];
+    item.representedObject = text;
+    item.toolTip = @"Copy to Clipboard";
+    [parent.submenu addItem:item];
+  }
+  if (recents.count) [parent.submenu addItem:NSMenuItem.separatorItem];
+  NSMenuItem *clear = [self item:@"Clear Menu" action:@selector(clearRecents:)];
+  clear.enabled = recents.count > 0;
+  [parent.submenu addItem:clear];
+  return parent;
+}
+
+- (NSMenuItem *)languageMenu {
+  NSMenuItem *parent = [self item:@"Language" action:nil];
+  parent.submenu = [NSMenu new];
+  NSString *selected = [NSUserDefaults.standardUserDefaults stringForKey:kLanguageKey];
+  for (NSString *language in SottoLanguages()) {
+    NSMenuItem *item = [self item:language action:@selector(chooseLanguage:)];
+    item.state = [language isEqualToString:selected] ? NSControlStateValueOn : NSControlStateValueOff;
+    [parent.submenu addItem:item];
+  }
+  return parent;
 }
 
 - (NSMenuItem *)item:(NSString *)title action:(SEL)action {
   NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:title action:action keyEquivalent:@""];
   item.target = self;
   return item;
-}
-
-- (NSMenuItem *)choiceMenu:(NSString *)title titles:(NSArray<NSString *> *)titles key:(NSString *)key {
-  NSMenuItem *parent = [self item:title action:nil];
-  parent.submenu = [NSMenu new];
-  NSString *current = [NSUserDefaults.standardUserDefaults stringForKey:key];
-  for (NSString *choice in titles) {
-    NSMenuItem *item = [self item:choice action:@selector(choose:)];
-    item.representedObject = key;
-    item.state = [choice isEqualToString:current] ? NSControlStateValueOn : NSControlStateValueOff;
-    [parent.submenu addItem:item];
-  }
-  return parent;
 }
 
 - (NSMenuItem *)microphoneMenu {
@@ -135,15 +134,14 @@
 #pragma mark Actions
 
 - (void)toggleDictation:(id)sender { [_dictation toggle]; }
-- (void)showFailure:(id)sender { [_dictation showMicrophoneFailure]; }
 - (void)clearRecents:(id)sender { [_dictation clearRecents]; }
 
 - (void)chooseMicrophone:(NSMenuItem *)sender {
   [NSUserDefaults.standardUserDefaults setObject:sender.representedObject forKey:kMicrophoneKey];
 }
 
-- (void)choose:(NSMenuItem *)sender {
-  [NSUserDefaults.standardUserDefaults setObject:sender.title forKey:sender.representedObject];
+- (void)chooseLanguage:(NSMenuItem *)sender {
+  [NSUserDefaults.standardUserDefaults setObject:sender.title forKey:kLanguageKey];
 }
 
 - (void)copyRecent:(NSMenuItem *)sender {

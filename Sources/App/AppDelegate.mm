@@ -17,19 +17,14 @@
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
   [NSUserDefaults.standardUserDefaults registerDefaults:@{
     kShowMenuBarExtraKey : @YES,
-    kOpenAtLoginKey : @NO,
     kPlaySoundsKey : @YES,
     kLanguageKey : SottoLanguages().firstObject,
     kMicrophoneKey : @"",
     kShortcutModeKey : @(kShortcutModeHoldOrDoubleTap),
-    kAutoPunctuationKey : @YES,
-    kRemoveFillerWordsKey : @YES,
     kKeepRecentsKey : @YES,
     kVocabularyKey : @[ @"AppKit", @"Objective-C", @"Cupertino" ],
   }];
 
-  // Read the API key now: if the keychain asks for permission, it asks at
-  // launch and not in the middle of the first dictation.
   (void)RecognizerService.selected.apiKey;
 
   NSApp.mainMenu = [self makeMainMenu];
@@ -42,8 +37,6 @@
   }
 }
 
-// People can hide the menu bar extra. Opening the app again is then the
-// way back to its settings.
 - (BOOL)applicationShouldHandleReopen:(NSApplication *)sender hasVisibleWindows:(BOOL)hasVisibleWindows {
   if (!hasVisibleWindows) [self showSettings:nil];
   return NO;
@@ -56,7 +49,6 @@
   [_settings.window orderFrontRegardless];
 }
 
-// Sent up the responder chain by the Privacy pane.
 - (IBAction)clearRecents:(id)sender {
   [_dictation clearRecents];
 }
@@ -68,8 +60,6 @@
   [_welcome.window orderFrontRegardless];
 }
 
-// The app is an agent, so this menu bar shows only while one of its
-// windows is in front.
 - (NSMenu *)makeMainMenu {
   NSMenu *main = [NSMenu new];
 
